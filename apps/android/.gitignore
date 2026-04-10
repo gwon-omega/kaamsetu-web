@@ -1,0 +1,88 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build outputs
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Expo-specific
+.expo/
+.expo-shared/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# React Native / Expo
+# Dependency directories
+# Bundled assets
+ios/Pods/
+node_modules/
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Xcode
+xcuserdata/
+*.xcworkspace/
+DerivedData/
+build/
+.xcode.env
+.xcode.env.local
+
+# Android
+android/local.properties
+android/.gradle/
+android/**/build/
+android/**/generated/
+android/captures/
+android/**/*.keystore
+
+# Environment files (NEVER COMMIT SECRETS)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# IDE
+.vscode/settings.json
+.vscode/*.code-workspace
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.pem
+*.p12
+.eas/
+
+# Temporary files
+*.tmp
+.cache/
+

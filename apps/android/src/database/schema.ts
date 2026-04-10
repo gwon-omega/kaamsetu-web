@@ -1,0 +1,116 @@
+/**
+ * WatermelonDB Schema Definition
+ * Defines the database schema for offline-first local database
+ */
+
+import { appSchema, tableSchema } from "@nozbe/watermelondb";
+
+export const schema = appSchema({
+  version: 1,
+  tables: [
+    tableSchema({
+      name: "workers",
+      columns: [
+        { name: "user_id", type: "string", isIndexed: true },
+        { name: "full_name", type: "string" },
+        { name: "phone", type: "string", isIndexed: true },
+        { name: "email", type: "string" },
+        { name: "profile_picture_url", type: "string", isOptional: true },
+        { name: "bio", type: "string", isOptional: true },
+        { name: "province_id", type: "number", isOptional: true },
+        { name: "district_id", type: "number", isOptional: true },
+        { name: "local_unit_id", type: "number", isOptional: true },
+        { name: "category_id", type: "number", isOptional: true },
+        { name: "rating", type: "number", isOptional: true },
+        { name: "total_reviews", type: "number", isOptional: true },
+        { name: "hourly_rate_npr", type: "number", isOptional: true },
+        { name: "is_verified", type: "boolean" },
+        { name: "is_active", type: "boolean" },
+        { name: "server_id", type: "string", isOptional: true },
+        { name: "is_synced", type: "boolean" },
+        { name: "needs_upload", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+        { name: "last_synced_at", type: "number", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      name: "hire_records",
+      columns: [
+        { name: "worker_id", type: "string", isIndexed: true },
+        { name: "hirer_id", type: "string", isIndexed: true },
+        { name: "hirer_ip", type: "string" },
+        { name: "ip_fingerprint", type: "string", isOptional: true },
+        { name: "status", type: "string" },
+        { name: "hire_province_id", type: "number", isOptional: true },
+        { name: "hire_district_id", type: "number", isOptional: true },
+        { name: "hire_local_unit_id", type: "number", isOptional: true },
+        { name: "work_description", type: "string", isOptional: true },
+        { name: "agreed_rate_npr", type: "number", isOptional: true },
+        { name: "work_date", type: "number", isOptional: true },
+        { name: "work_duration_days", type: "number" },
+        { name: "hired_at", type: "number" },
+        { name: "accepted_at", type: "number", isOptional: true },
+        { name: "completed_at", type: "number", isOptional: true },
+        { name: "cancelled_at", type: "number", isOptional: true },
+        { name: "rating", type: "number", isOptional: true },
+        { name: "review_text", type: "string", isOptional: true },
+        { name: "reviewed_at", type: "number", isOptional: true },
+        { name: "server_id", type: "string", isOptional: true },
+        { name: "is_synced", type: "boolean" },
+        { name: "needs_upload", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+        { name: "last_synced_at", type: "number", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      name: "provinces",
+      columns: [
+        { name: "server_id", type: "string", isOptional: true },
+        { name: "name", type: "string" },
+        { name: "code", type: "string", isOptional: true },
+        { name: "is_synced", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "districts",
+      columns: [
+        { name: "province_id", type: "number", isIndexed: true },
+        { name: "server_id", type: "string", isOptional: true },
+        { name: "name", type: "string" },
+        { name: "code", type: "string", isOptional: true },
+        { name: "is_synced", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "local_units",
+      columns: [
+        { name: "district_id", type: "number", isIndexed: true },
+        { name: "server_id", type: "string", isOptional: true },
+        { name: "name", type: "string" },
+        { name: "code", type: "string", isOptional: true },
+        { name: "is_synced", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "job_categories",
+      columns: [
+        { name: "server_id", type: "string", isOptional: true },
+        { name: "name", type: "string" },
+        { name: "description", type: "string", isOptional: true },
+        { name: "icon_url", type: "string", isOptional: true },
+        { name: "is_active", type: "boolean" },
+        { name: "is_synced", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+  ],
+});
