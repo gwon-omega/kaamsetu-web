@@ -9,6 +9,10 @@ const targetDist = resolve(repoRoot, "dist");
 execSync("pnpm exec vite build", {
   cwd: appDir,
   stdio: "inherit",
+  env: {
+    ...process.env,
+    VITE_CJS_IGNORE_WARNING: "true",
+  },
 });
 
 const candidateDists = [
