@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 
 const repoRoot = process.cwd();
 const appDir = resolve(repoRoot, "apps/web");
-const sourceDist = resolve(appDir, "dist");
 const targetDist = resolve(repoRoot, "dist");
 
 execSync("pnpm exec vite build", {
@@ -12,11 +11,23 @@ execSync("pnpm exec vite build", {
   stdio: "inherit",
 });
 
-if (!existsSync(sourceDist)) {
-  throw new Error(`Build output not found at ${sourceDist}`);
+const candidateDists = [
+  resolve(appDir, "dist"),
+  resolve(repoRoot, "dist"),
+  resolve(appDir, "apps/web/dist"),
+];
+
+const sourceDist = candidateDists.find((path) => existsSync(path));
+
+if (!sourceDist) {
+  throw new Error(
+    `Build output not found. Checked: ${candidateDists.join(", ")}`,
+  );
 }
 
-rmSync(targetDist, { recursive: true, force: true });
-cpSync(sourceDist, targetDist, { recursive: true });
+if (sourceDist !== targetDist) {
+  rmSync(targetDist, { recursive: true, force: true });
+  cpSync(sourceDist, targetDist, { recursive: true });
+}
 
-console.log(`Copied ${sourceDist} to ${targetDist}`);
+console.log(`Using build output from ${sourceDist}`);
