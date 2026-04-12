@@ -19,12 +19,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load from environment
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_ACCESS_TOKEN;
+const SUPABASE_URL =
+  process.env.PUBLIC_SUPABASE_URL ??
+  process.env.VITE_SUPABASE_URL ??
+  process.env.SUPABASE_URL;
+const SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SECRET_ACCESS_TOKEN;
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error("❌ Error: Missing environment variables");
-  console.error("   Required: VITE_SUPABASE_URL, SUPABASE_SECRET_ACCESS_TOKEN");
+  console.error(
+    "   Required: PUBLIC_SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_ACCESS_TOKEN)",
+  );
   process.exit(1);
 }
 

@@ -16,7 +16,7 @@ Production bootstrap for the Nepal local-government manpower platform.
 
 3. Run web app:
 
-   pnpm --filter @shram-sewa/web dev
+   pnpm dev
 
 4. Build web app:
 

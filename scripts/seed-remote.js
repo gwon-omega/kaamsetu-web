@@ -13,12 +13,17 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_ACCESS_TOKEN;
+const SUPABASE_URL =
+  process.env.PUBLIC_SUPABASE_URL ??
+  process.env.VITE_SUPABASE_URL ??
+  process.env.SUPABASE_URL;
+const SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SECRET_ACCESS_TOKEN;
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error(
-    "❌ Missing SUPABASE_URL or SUPABASE_SECRET_ACCESS_TOKEN in environment",
+    "❌ Missing PUBLIC_SUPABASE_URL (or VITE_SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_ACCESS_TOKEN) in environment",
   );
   process.exit(1);
 }

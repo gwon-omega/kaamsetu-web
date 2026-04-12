@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #faf7f0;
+  --bg-surface: #ffffff;
+  --text-primary: #0a1520;
+  --text-muted: #5a4c3a;
+  --crimson-500: #a02535;
+  --crimson-700: #7c1d2b;
+  --gold-500: #c9971c;
+  --surface-shadow: 0 18px 48px -22px rgba(10, 21, 32, 0.35);
+  --surface-border: rgba(255, 255, 255, 0.65);
+  --motion-fast: 150ms;
+  --motion-standard: 220ms;
+  --motion-emphasized: 280ms;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: radial-gradient(
+    circle at 10% 10%,
+    #f3ecdf 0%,
+    #faf7f0 50%,
+    #f4efe5 100%
+  );
+}
+
+body {
+  margin: 0;
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+  background-color: transparent;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html[data-locale="ne"] body {
+  font-family: "Noto Sans Devanagari", "DM Sans", sans-serif;
+}
+
+html[data-locale="en"] .font-display {
+  font-family: "Fraunces", Georgia, serif;
+}
+
+html[data-locale="ne"] .font-display {
+  font-family: "Noto Serif Devanagari", "Noto Sans Devanagari", serif;
+}
+
+.font-np {
+  font-family: "Noto Sans Devanagari", sans-serif;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--crimson-500);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e8ddd0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #9f8d76;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6d5e4a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  @keyframes soft-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes soft-glow {
+    0%,
+    100% {
+      box-shadow: var(--surface-shadow);
+    }
+    50% {
+      box-shadow: 0 22px 54px -26px rgba(10, 21, 32, 0.4);
+    }
+  }
+
+  .content-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 640px;
+  }
+
+  .animate-soft-float {
+    animation: none;
+  }
+
+  .animate-soft-glow {
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-soft-float {
+      animation: soft-float 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    .animate-soft-glow {
+      animation: soft-glow 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+  }
+
+  .bg-hero-mesh {
+    background:
+      radial-gradient(
+        circle at 8% 10%,
+        rgba(201, 151, 28, 0.32),
+        transparent 32%
+      ),
+      radial-gradient(
+        circle at 90% 20%,
+        rgba(160, 37, 53, 0.35),
+        transparent 35%
+      ),
+      linear-gradient(130deg, rgba(13, 30, 53, 0.96), rgba(28, 53, 87, 0.92));
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid var(--surface-border);
+    box-shadow: var(--surface-shadow);
+    backdrop-filter: blur(8px);
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen grid place-items-center p-6;
+  }
+
+  .card {
+    @apply max-w-2xl w-full bg-white/90 border border-terrain-200 rounded-card p-8;
+    box-shadow: var(--surface-shadow);
+  }
+
+  .tag {
+    @apply inline-block px-3 py-1 bg-crimson-100 text-crimson-700 rounded-full text-sm font-bold;
+  }
+
+  .btn-primary {
+    @apply bg-crimson-700 text-white px-6 py-3 rounded-button font-semibold;
+    transition-property: background-color, color, box-shadow, transform;
+    transition-duration: var(--motion-standard);
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -12px rgba(124, 29, 43, 0.9);
+  }
+
+  .btn-secondary {
+    @apply bg-terrain-200 text-mountain-700 px-6 py-3 rounded-button font-semibold
+           hover:bg-terrain-300 transition-colors;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+}

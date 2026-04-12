@@ -1,9 +1,13 @@
+import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
+const middlewareMode = process.env.VITE_MIDDLEWARE_MODE === "true";
+
 export default defineConfig({
+  envPrefix: ["VITE_", "PUBLIC_"],
   plugins: [
     react(),
     VitePWA({
@@ -36,7 +40,30 @@ export default defineConfig({
     sourcemap: false,
     minify: "terser",
   },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      react: path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "@tanstack/react-query": path.resolve(
+        __dirname,
+        "node_modules/@tanstack/react-query",
+      ),
+    },
+    dedupe: ["react", "react-dom", "@tanstack/react-query"],
+  },
   server: {
-    middlewareMode: true,
+    fs: {
+      // Ensure linked workspace packages outside apps/web are watchable in dev.
+      allow: [
+        path.resolve(__dirname),
+        path.resolve(__dirname, "../../packages"),
+      ],
+    },
+    ...(middlewareMode
+      ? {
+          middlewareMode: true,
+        }
+      : {}),
   },
 });

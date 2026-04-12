@@ -1,0 +1,12 @@
+export { default as HomePage } from "./home";
+export { default as SearchPage } from "./search";
+export { default as WorkerPage } from "./worker";
+export { default as HirePage } from "./hire";
+export { default as ProfilePage } from "./profile";
+export { default as LoginPage } from "./login";
+export { default as HowItWorksPage } from "./how-it-works";
+export { default as FaqPage } from "./faq";
+export { default as PrivacyPage } from "./privacy";
+export { default as TermsPage } from "./terms";
+export { default as GuidelinesPage } from "./guidelines";
+export { default as ContactPage } from "./contact";
