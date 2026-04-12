@@ -36,9 +36,10 @@ export function useWorkers(
     queryKey: queryKeys.workers.search({ ...filters, page, pageSize }),
     queryFn: () => workersApi.search(filters, page, pageSize),
     enabled: backendReady,
+    networkMode: "offlineFirst",
     retry: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
     staleTime: 5 * 60 * 1000, // 5 minutes
     placeholderData: (previousData) => previousData, // Keep old data while fetching
   });
@@ -54,9 +55,10 @@ export function useWorker(workerId: string | undefined, enabled = true) {
     queryKey: queryKeys.workers.detail(workerId ?? ""),
     queryFn: () => workersApi.getById(workerId!),
     enabled: backendReady && !!workerId,
+    networkMode: "offlineFirst",
     retry: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
@@ -75,6 +77,7 @@ export function usePrefetchWorker() {
     queryClient.prefetchQuery({
       queryKey: queryKeys.workers.detail(workerId),
       queryFn: () => workersApi.getById(workerId),
+      staleTime: 10 * 60 * 1000,
     });
   };
 }

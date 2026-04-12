@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-query"],
     alias: {
+      "@": path.resolve(__dirname, "src"),
       react: path.resolve(__dirname, "node_modules/react"),
       "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
       "@tanstack/react-query": path.resolve(
@@ -19,6 +20,7 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     exclude: ["node_modules/**", "dist/**", "Skills/**"],
+    pool: "vmThreads",
     restoreMocks: true,
     clearMocks: true,
     mockReset: true,

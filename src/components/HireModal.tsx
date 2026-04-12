@@ -16,7 +16,10 @@ import {
   resolveClientIpAddress,
   setHireIpLock,
 } from "../lib";
-import { enqueueHireOutbox, isLikelyNetworkCutoffError } from "../lib/hire-outbox";
+import {
+  enqueueHireOutbox,
+  isLikelyNetworkCutoffError,
+} from "../lib/hire-outbox";
 import { useCreateHireMutation } from "../hooks";
 import { useToast } from "../components/ToastContainer";
 import NepaliDate from "nepali-date";

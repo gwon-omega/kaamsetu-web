@@ -45,7 +45,10 @@ function canUseLocalStorage() {
 }
 
 function generateOutboxId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
 
@@ -128,7 +131,9 @@ function updateOutboxItem(
   itemId: string,
   patch: Partial<HireOutboxItem>,
 ): HireOutboxItem[] {
-  return items.map((item) => (item.id === itemId ? { ...item, ...patch } : item));
+  return items.map((item) =>
+    item.id === itemId ? { ...item, ...patch } : item,
+  );
 }
 
 export function isLikelyNetworkCutoffError(error: unknown) {
@@ -201,8 +206,12 @@ async function submitQueuedHire(payload: CreateHireRequest) {
   const hire = await hireApi.create(payload);
 
   queryClient.invalidateQueries({ queryKey: queryKeys.hires.all });
-  queryClient.invalidateQueries({ queryKey: queryKeys.hires.byWorker(hire.workerId) });
-  queryClient.invalidateQueries({ queryKey: queryKeys.hires.byHirer(hire.hirerId) });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.hires.byWorker(hire.workerId),
+  });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.hires.byHirer(hire.hirerId),
+  });
 
   void notificationsApi.dispatchHireRequest(hire.id).catch((error) => {
     void reportWebError({
@@ -259,7 +268,8 @@ export async function flushHireOutbox(): Promise<FlushResult> {
         if (isLikelyNetworkCutoffError(error)) {
           outbox = updateOutboxItem(outbox, item.id, {
             attempts,
-            lastError: error instanceof Error ? error.message : "Network cutoff",
+            lastError:
+              error instanceof Error ? error.message : "Network cutoff",
           });
           writeOutbox(outbox);
           break;
@@ -272,7 +282,8 @@ export async function flushHireOutbox(): Promise<FlushResult> {
         } else {
           outbox = updateOutboxItem(outbox, item.id, {
             attempts,
-            lastError: error instanceof Error ? error.message : "Unknown outbox error",
+            lastError:
+              error instanceof Error ? error.message : "Unknown outbox error",
           });
           writeOutbox(outbox);
         }

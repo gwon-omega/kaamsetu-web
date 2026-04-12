@@ -5,8 +5,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { hireApi, notificationsApi } from "@shram-sewa/shared/api";
-import { useCreateHireMutation } from "../../apps/web/src/hooks/use-hire";
-import { queryKeys } from "../../apps/web/src/lib/query-client";
+import { useCreateHireMutation } from "../../src/hooks/use-hire";
+import { queryKeys } from "../../src/lib/query-client";
 
 describe("web hire flow integration", () => {
   beforeEach(() => {

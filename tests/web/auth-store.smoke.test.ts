@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authApi } from "@shram-sewa/shared";
-import * as webLib from "../../apps/web/src/lib";
-import { useAuthStore } from "../../apps/web/src/store/auth-store";
+import * as webLib from "../../src/lib";
+import { useAuthStore } from "../../src/store/auth-store";
 
 const baseUser = {
   id: "user-1",

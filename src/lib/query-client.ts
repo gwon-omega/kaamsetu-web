@@ -3,6 +3,8 @@
  */
 
 import { MutationCache, QueryClient } from "@tanstack/react-query";
+import { persistQueryClient } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { reportWebMutationFailure } from "./monitoring";
 
 const mutationCache = new MutationCache({
@@ -18,6 +20,9 @@ export const queryClient = new QueryClient({
   mutationCache,
   defaultOptions: {
     queries: {
+      // Prefer cached data first when offline or on unstable connections.
+      networkMode: "offlineFirst",
+
       // Stale time: data is fresh for 5 minutes
       staleTime: 5 * 60 * 1000,
 
@@ -37,11 +42,56 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: true,
     },
     mutations: {
+      networkMode: "online",
       // Retry mutations once
       retry: 1,
     },
   },
 });
+
+const QUERY_CACHE_KEY = "shram-sewa-query-cache-v1";
+let persistenceInitialized = false;
+
+function canPersistQueryCache() {
+  return (
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+  );
+}
+
+export function setupQueryCachePersistence() {
+  if (persistenceInitialized || !canPersistQueryCache()) {
+    return;
+  }
+
+  const persister = createSyncStoragePersister({
+    storage: window.localStorage,
+    key: QUERY_CACHE_KEY,
+    throttleTime: 1500,
+  });
+
+  persistQueryClient({
+    queryClient,
+    persister,
+    maxAge: 1000 * 60 * 60 * 12, // 12 hours
+    buster: "web-cache-v1",
+    dehydrateOptions: {
+      shouldDehydrateQuery: (query) => {
+        if (query.state.status !== "success") {
+          return false;
+        }
+
+        const [scope] = query.queryKey;
+        return (
+          scope === "workers" ||
+          scope === "geodata" ||
+          scope === "jobCategories"
+        );
+      },
+    },
+  });
+
+  persistenceInitialized = true;
+}
 
 /**
  * Query key factory for type-safe query keys

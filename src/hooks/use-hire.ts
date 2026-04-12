@@ -12,7 +12,10 @@ import { useAuthStore } from "../store/auth-store";
 import { reportWebError } from "../lib/monitoring";
 import { queryKeys } from "../lib/query-client";
 import { getSupabaseClient, isSupabaseConfigured } from "../lib";
-import { enqueueHireOutbox, isLikelyNetworkCutoffError } from "../lib/hire-outbox";
+import {
+  enqueueHireOutbox,
+  isLikelyNetworkCutoffError,
+} from "../lib/hire-outbox";
 
 function canUseBackend() {
   if (!isSupabaseConfigured()) {

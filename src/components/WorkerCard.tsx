@@ -6,7 +6,9 @@
 
 import { Card, CardContent, Badge, Button } from "./ui";
 import { MapPin, Star, Phone, CheckCircle, Clock } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useUIStore } from "../store";
+import { usePrefetchWorker } from "../hooks";
 import { motion, useReducedMotion } from "framer-motion";
 import type { WorkerDisplay } from "@shram-sewa/shared";
 
@@ -24,6 +26,7 @@ export function WorkerCard({
   showHireButton = true,
 }: WorkerCardProps) {
   const { locale } = useUIStore();
+  const prefetchWorker = usePrefetchWorker();
   const reduceMotion = useReducedMotion();
   const isNepali = locale === "ne";
   const displayName = isNepali
@@ -39,8 +42,13 @@ export function WorkerCard({
     }
   };
 
+  const handlePrefetch = () => {
+    prefetchWorker(worker.id);
+  };
+
   return (
     <motion.div
+      onHoverStart={handlePrefetch}
       whileHover={reduceMotion ? undefined : { y: -2, scale: 1.005 }}
       whileTap={reduceMotion ? undefined : { scale: 0.992 }}
       transition={
@@ -80,9 +88,18 @@ export function WorkerCard({
             {/* Name & Status */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-mountain-900 truncate">
-                  {displayName}
-                </h3>
+                <Link
+                  to="/worker/$workerId"
+                  params={{ workerId: worker.id }}
+                  preload="intent"
+                  onFocus={handlePrefetch}
+                  onMouseEnter={handlePrefetch}
+                  className="inline-flex max-w-full"
+                >
+                  <h3 className="font-semibold text-mountain-900 truncate hover:text-crimson-700 transition-colors">
+                    {displayName}
+                  </h3>
+                </Link>
                 <p className="text-sm text-terrain-500">
                   {isNepali
                     ? worker.jobCategory.nameNp

@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useUIStore, useFilterStore } from "../store";
 import {
   provinces,
@@ -34,7 +40,9 @@ const jobCategoryIdBySlug = new Map(
   jobCategoryOptions.map((category) => [category.slug, category.id]),
 );
 
-const PAGE_SIZE = 9;
+const PAGE_COLUMNS = 3;
+const PAGE_ROWS = 3;
+const PAGE_SIZE = PAGE_COLUMNS * PAGE_ROWS;
 
 function parsePageParam(value: string | null): number {
   if (!value) {
@@ -112,10 +120,13 @@ export default function SearchPage() {
     null,
   );
   const [isHireModalOpen, setIsHireModalOpen] = useState(false);
+  const [isPendingTransition, startTransition] = useTransition();
 
   const toast = useToast();
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 160);
+  const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
   const isSearching = debouncedSearchQuery.trim().length > 0;
+  const isSearchDeferred = deferredSearchQuery !== debouncedSearchQuery;
   const isNepali = locale === "ne";
   const reduceMotion = useReducedMotion();
   const backendConfigured = isSupabaseConfigured();
@@ -200,11 +211,11 @@ export default function SearchPage() {
   );
 
   const filteredWorkers = useMemo(() => {
-    if (!debouncedSearchQuery.trim()) {
+    if (!deferredSearchQuery.trim()) {
       return workers;
     }
 
-    const q = debouncedSearchQuery.trim().toLowerCase();
+    const q = deferredSearchQuery.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, "");
 
     return workers.filter((worker) => {
@@ -244,7 +255,7 @@ export default function SearchPage() {
         wardMatches
       );
     });
-  }, [debouncedSearchQuery, workers]);
+  }, [deferredSearchQuery, workers]);
 
   const isLoading =
     backendConfigured && (workersQuery.isLoading || workersQuery.isFetching);
@@ -262,12 +273,16 @@ export default function SearchPage() {
         : "Failed to load workers";
 
   const handleClearFilters = () => {
-    clearFilters();
-    setCurrentPage(1);
+    startTransition(() => {
+      clearFilters();
+      setCurrentPage(1);
+    });
   };
 
   const handlePageChange = (nextPage: number) => {
-    setCurrentPage(Math.max(1, nextPage));
+    startTransition(() => {
+      setCurrentPage(Math.max(1, nextPage));
+    });
   };
 
   const handleHireClick = (workerId: string) => {
@@ -363,11 +378,13 @@ export default function SearchPage() {
                     <select
                       value={provinceId || ""}
                       onChange={(e) => {
-                        setProvinceId(
-                          e.target.value ? Number(e.target.value) : undefined,
-                        );
-                        setDistrictId(undefined);
-                        setCurrentPage(1);
+                        startTransition(() => {
+                          setProvinceId(
+                            e.target.value ? Number(e.target.value) : undefined,
+                          );
+                          setDistrictId(undefined);
+                          setCurrentPage(1);
+                        });
                       }}
                       className="w-full h-10 rounded-md border border-terrain-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-crimson-500"
                     >
@@ -390,10 +407,12 @@ export default function SearchPage() {
                     <select
                       value={districtId || ""}
                       onChange={(e) => {
-                        setDistrictId(
-                          e.target.value ? Number(e.target.value) : undefined,
-                        );
-                        setCurrentPage(1);
+                        startTransition(() => {
+                          setDistrictId(
+                            e.target.value ? Number(e.target.value) : undefined,
+                          );
+                          setCurrentPage(1);
+                        });
                       }}
                       disabled={!provinceId}
                       className="w-full h-10 rounded-md border border-terrain-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-crimson-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -417,10 +436,12 @@ export default function SearchPage() {
                     <select
                       value={jobCategory || ""}
                       onChange={(e) => {
-                        setJobCategory(
-                          e.target.value ? Number(e.target.value) : undefined,
-                        );
-                        setCurrentPage(1);
+                        startTransition(() => {
+                          setJobCategory(
+                            e.target.value ? Number(e.target.value) : undefined,
+                          );
+                          setCurrentPage(1);
+                        });
                       }}
                       className="w-full h-10 rounded-md border border-terrain-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-crimson-500"
                     >
@@ -451,6 +472,11 @@ export default function SearchPage() {
               ? "फिल्टर प्रयोग गरेर कार्य वर्ग हेर्नुहोस्"
               : "Browse by filters and job categories"}
         </h2>
+        {backendConfigured && (isSearchDeferred || isPendingTransition) && (
+          <span className="text-xs text-terrain-500 animate-pulse">
+            {isNepali ? "अपडेट हुँदैछ..." : "Updating..."}
+          </span>
+        )}
       </div>
 
       {!backendConfigured && (

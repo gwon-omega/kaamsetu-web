@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { workersApi } from "@shram-sewa/shared/api";
-import { useWorkers } from "../../apps/web/src/hooks/use-workers";
-import * as webLib from "../../apps/web/src/lib";
+import { useWorkers } from "../../src/hooks/use-workers";
+import * as webLib from "../../src/lib";
 
 function createWrapper(queryClient: QueryClient) {
   return ({ children }: { children: React.ReactNode }) => (
