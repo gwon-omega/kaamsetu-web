@@ -2,12 +2,17 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { MotionConfig } from "framer-motion";
 import { useEffect } from "react";
-import { queryClient } from "./lib/query-client";
+import { setupHireOutboxSync } from "./lib/hire-outbox";
+import { queryClient, setupQueryCachePersistence } from "./lib/query-client";
 import { setupWebGlobalErrorMonitoring } from "./lib/monitoring";
 import { router } from "./router";
 
 export default function App() {
-  useEffect(() => setupWebGlobalErrorMonitoring(), []);
+  useEffect(() => {
+    setupQueryCachePersistence();
+    setupHireOutboxSync();
+    return setupWebGlobalErrorMonitoring();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

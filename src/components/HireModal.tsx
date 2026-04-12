@@ -16,7 +16,9 @@ import {
   resolveClientIpAddress,
   setHireIpLock,
 } from "../lib";
+import { enqueueHireOutbox, isLikelyNetworkCutoffError } from "../lib/hire-outbox";
 import { useCreateHireMutation } from "../hooks";
+import { useToast } from "../components/ToastContainer";
 import NepaliDate from "nepali-date";
 
 interface HireModalProps {
@@ -34,6 +36,7 @@ interface HireModalProps {
 export function HireModal({ isOpen, onClose, worker }: HireModalProps) {
   const { locale } = useUIStore();
   const createHireMutation = useCreateHireMutation();
+  const toast = useToast();
   const isNepali = locale === "ne";
 
   const defaultRate = worker.dailyRate ?? 0;
@@ -79,8 +82,7 @@ export function HireModal({ isOpen, onClose, worker }: HireModalProps) {
 
     try {
       const ipFingerprint = createIpFingerprint();
-
-      await createHireMutation.mutateAsync({
+      const payload = {
         workerId: worker.id,
         hirerIp: hirerIp ?? undefined,
         ipFingerprint,
@@ -88,13 +90,38 @@ export function HireModal({ isOpen, onClose, worker }: HireModalProps) {
         agreedRateNpr: agreedRate > 0 ? agreedRate : undefined,
         workDate: new Date(workDate),
         workDurationDays: workDays,
-      });
+      };
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        enqueueHireOutbox(payload);
+        toast.info(
+          isNepali ? "अनुरोध सुरक्षित गरियो" : "Request saved",
+          isNepali
+            ? "इन्टरनेट फर्केपछि भाडा अनुरोध आफैं पठाइन्छ।"
+            : "This hire request will auto-send when internet returns.",
+        );
+        onClose();
+        return;
+      }
+
+      await createHireMutation.mutateAsync(payload);
 
       if (hirerIp) {
         setHireIpLock(worker.id, hirerIp, ipFingerprint);
       }
       onClose();
     } catch (mutationError) {
+      if (isLikelyNetworkCutoffError(mutationError)) {
+        toast.info(
+          isNepali ? "अनुरोध सुरक्षित गरियो" : "Request saved",
+          isNepali
+            ? "नेटवर्क कट हुँदा अनुरोध सुरक्षित गरिएको छ। इन्टरनेट फर्केपछि पठाइन्छ।"
+            : "Network dropped. Your request has been queued and will sync automatically.",
+        );
+        onClose();
+        return;
+      }
+
       setError(
         mutationError instanceof Error
           ? mutationError.message

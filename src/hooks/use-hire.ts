@@ -12,6 +12,7 @@ import { useAuthStore } from "../store/auth-store";
 import { reportWebError } from "../lib/monitoring";
 import { queryKeys } from "../lib/query-client";
 import { getSupabaseClient, isSupabaseConfigured } from "../lib";
+import { enqueueHireOutbox, isLikelyNetworkCutoffError } from "../lib/hire-outbox";
 
 function canUseBackend() {
   if (!isSupabaseConfigured()) {
@@ -81,6 +82,29 @@ export function useCreateHireMutation() {
             hirerId: hire.hirerId,
           },
         });
+      });
+    },
+    onError: (error, input) => {
+      if (!isLikelyNetworkCutoffError(error)) {
+        return;
+      }
+
+      const { queued, duplicate } = enqueueHireOutbox(input);
+      if (!queued) {
+        return;
+      }
+
+      void reportWebError({
+        category: "network",
+        level: "warning",
+        message: duplicate
+          ? "Hire request already queued for retry"
+          : "Hire request queued for retry after network cutoff",
+        context: {
+          workerId: input.workerId,
+          hasHirerIp: Boolean(input.hirerIp),
+          duplicate,
+        },
       });
     },
   });
