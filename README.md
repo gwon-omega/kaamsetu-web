@@ -71,6 +71,8 @@ Production bootstrap for the Nepal local-government manpower platform.
 ## Root Scripts
 
 - pnpm dev
-- pnpm build
 - pnpm lint
 - pnpm typecheck
+- pnpm release:android
+- pnpm release:android:preview
+- pnpm release:android:submit

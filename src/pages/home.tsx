@@ -151,8 +151,8 @@ export default function HomePage() {
 
             <p className="mt-4 text-xs text-terrain-500 leading-relaxed">
               {isNepali
-                ? "तस्बिर स्रोत: Pexels royalty-free stock"
-                : "Image source: Pexels royalty-free stock"}
+                ? "तस्बिर स्रोत: Wikimedia Commons"
+                : "Image source: Wikimedia Commons"}
             </p>
           </motion.div>
         </div>

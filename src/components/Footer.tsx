@@ -4,8 +4,9 @@
  */
 
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useUIStore } from "../store";
-import { MapPin, Phone, Mail, Globe } from "lucide-react";
+import { MapPin, Phone, Mail, Globe, Loader2 } from "lucide-react";
 
 const PLAY_STORE_URL =
   (import.meta as any).env?.PUBLIC_ANDROID_PLAY_STORE_URL ||
@@ -14,6 +15,7 @@ const PLAY_STORE_URL =
   "#";
 const GOOGLE_DRIVE_URL =
   (import.meta as any).env?.PUBLIC_ANDROID_APK_DRIVE_URL ||
+  (import.meta as any).env?.PUBLIC_ANDROID_APK_URL ||
   (import.meta as any).env?.VITE_ANDROID_APK_DRIVE_URL ||
   (import.meta as any).env?.VITE_GOOGLE_DRIVE_URL ||
   "#";
@@ -24,6 +26,42 @@ export function Footer() {
   const isNepali = locale === "ne";
   const appDownloadUrl =
     GOOGLE_DRIVE_URL !== "#" ? GOOGLE_DRIVE_URL : PLAY_STORE_URL;
+
+  const [downloadState, setDownloadState] = useState<
+    "idle" | "loading" | "error"
+  >("idle");
+
+  const handleDownloadClick = async (
+    e: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    e.preventDefault();
+    if (downloadState === "loading") return;
+
+    setDownloadState("loading");
+
+    try {
+      // Show loading UI momentarily
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Attempt to ping the URL to check connectivity (mode: 'no-cors' allows opaque responses without CORS issues)
+      await fetch(appDownloadUrl, { mode: "no-cors" });
+
+      // Create physical anchor to trigger download robustly
+      const link = document.createElement("a");
+      link.href = appDownloadUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Revert button shortly after triggering
+      setTimeout(() => setDownloadState("idle"), 2000);
+    } catch (err) {
+      console.error("Download failed:", err);
+      setDownloadState("error");
+    }
+  };
 
   return (
     <footer className="text-white bg-[radial-gradient(circle_at_15%_20%,#1f3e66_0%,#112641_45%,#0a1520_100%)] border-t border-mountain-700/60">
@@ -168,23 +206,59 @@ export function Footer() {
                 ? "एन्ड्रोइड एप डाउनलोड गर्नुहोस्"
                 : "Get the Android app"}
             </p>
-            <a
-              href={appDownloadUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={
-                isNepali ? "एन्ड्रोइड एप डाउनलोड" : "Download Android app"
-              }
-              className="inline-flex rounded-xl bg-white/5 p-1 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
-            >
-              <img
-                src={PLAY_STORE_BADGE_SRC}
-                alt={
-                  isNepali ? "Google Play बाट डाउनलोड" : "Get it on Google Play"
+
+            {downloadState === "idle" ? (
+              <a
+                href={appDownloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={handleDownloadClick}
+                aria-label={
+                  isNepali ? "एन्ड्रोइड एप डाउनलोड" : "Download Android app"
                 }
-                className="h-[3.75rem] sm:h-[4.25rem] md:h-[4.75rem] w-auto max-w-[17.5rem] md:max-w-[19rem] drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)]"
-              />
-            </a>
+                className="inline-flex transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 relative"
+              >
+                <img
+                  src={PLAY_STORE_BADGE_SRC}
+                  alt={
+                    isNepali
+                      ? "Google Play बाट डाउनलोड"
+                      : "Get it on Google Play"
+                  }
+                  className="h-[5rem] sm:h-[5.15rem] md:h-[5rem] w-auto max-w-[20.5rem] md:max-w-[20rem]"
+                />
+              </a>
+            ) : (
+              <div className="h-[5rem] sm:h-[5.15rem] md:h-[5rem] w-[13.5rem] sm:w-[14rem] bg-mountain-800/50 rounded-xl border border-mountain-700 flex flex-col items-center justify-center p-3 animate-in fade-in zoom-in-95 duration-200">
+                {downloadState === "loading" ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin text-gold-300 mb-2" />
+                    <span className="text-[13px] font-medium text-terrain-100 whitespace-nowrap">
+                      {isNepali
+                        ? "डाउनलोड तयार गर्दै..."
+                        : "Preparing download..."}
+                    </span>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-xs text-crimson-400 mb-2 flex items-center justify-center gap-1 font-medium">
+                      {isNepali ? "डाउनलोड असफल भयो।" : "Download failed."}
+                    </p>
+                    <a
+                      href={GOOGLE_DRIVE_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-bold text-gold-300 hover:text-gold-100 hover:underline transition-colors"
+                      onClick={() => setDownloadState("idle")}
+                    >
+                      {isNepali
+                        ? "ड्राइभ लिङ्क प्रयोग गर्नुहोस्"
+                        : "Try Drive link ->"}
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

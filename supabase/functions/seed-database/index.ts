@@ -13,6 +13,50 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const baseCorsHeaders = {
+  "Access-Control-Allow-Headers": "authorization, x-client-info, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function getAllowedOrigins(): string[] {
+  const configured = Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "";
+  return configured
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+function resolveCorsOrigin(req: Request): string {
+  const origin = req.headers.get("origin")?.trim();
+  if (!origin) {
+    return "*";
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
+    return "*";
+  }
+
+  return allowedOrigins.includes(origin) ? origin : "null";
+}
+
+function withCorsHeaders(
+  req: Request,
+  headers: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    ...baseCorsHeaders,
+    ...headers,
+    "Access-Control-Allow-Origin": resolveCorsOrigin(req),
+    Vary: "Origin",
+  };
+}
+
+function isBlockedByCors(req: Request): boolean {
+  const origin = req.headers.get("origin")?.trim();
+  return Boolean(origin) && resolveCorsOrigin(req) === "null";
+}
+
 const createAdminClient = () => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -137,10 +181,15 @@ async function seedJobCategories(client: any) {
 }
 
 async function seedAdminAccount(client: any) {
+  const adminSeedPassword = Deno.env.get("ADMIN_SEED_PASSWORD");
+  if (!adminSeedPassword || adminSeedPassword.length < 12) {
+    throw new Error("ADMIN_SEED_PASSWORD must be configured and at least 12 chars.");
+  }
+
   // Create admin user via auth
   const { data: admin, error: authError } = await client.auth.admin.createUser({
     email: "admin@shramsewa.com.np",
-    password: "projectsewa",
+    password: adminSeedPassword,
     email_confirm: true,
     user_metadata: {
       full_name: "Admin",
@@ -171,27 +220,53 @@ async function seedAdminAccount(client: any) {
   return 1;
 }
 
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, content-type",
-};
-
 Deno.serve(async (req) => {
+  if (isBlockedByCors(req)) {
+    return new Response("Origin not allowed", {
+      status: 403,
+      headers: withCorsHeaders(req),
+    });
+  }
+
   // CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: withCorsHeaders(req) });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed." }), {
+      status: 405,
+      headers: {
+        ...withCorsHeaders(req),
+        "Content-Type": "application/json",
+      },
+    });
   }
 
   try {
+    if (Deno.env.get("ALLOW_DEMO_SEEDING") !== "true") {
+      return new Response(
+        JSON.stringify({ error: "Database seeding is disabled in this environment." }),
+        {
+          status: 403,
+          headers: {
+            ...withCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
     // Verify authentication
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!authHeader || !serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
       return new Response(
         JSON.stringify({ error: "Missing or invalid authorization" }),
         {
           status: 401,
           headers: {
-            ...corsHeaders,
+            ...withCorsHeaders(req),
             "Content-Type": "application/json",
           },
         },
@@ -233,7 +308,7 @@ Deno.serve(async (req) => {
       {
         status: 200,
         headers: {
-          ...corsHeaders,
+          ...withCorsHeaders(req),
           "Content-Type": "application/json",
         },
       },
@@ -248,7 +323,7 @@ Deno.serve(async (req) => {
       {
         status: 500,
         headers: {
-          ...corsHeaders,
+          ...withCorsHeaders(req),
           "Content-Type": "application/json",
         },
       },

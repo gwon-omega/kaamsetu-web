@@ -1,11 +1,50 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+function getAllowedOrigins(): string[] {
+  const configured = Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "";
+  return configured
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+function resolveCorsOrigin(req: Request): string {
+  const origin = req.headers.get("origin")?.trim();
+  if (!origin) {
+    return "*";
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
+    return "*";
+  }
+
+  return allowedOrigins.includes(origin) ? origin : "null";
+}
+
+function withCorsHeaders(
+  req: Request,
+  headers: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    ...baseCorsHeaders,
+    ...headers,
+    "Access-Control-Allow-Origin": resolveCorsOrigin(req),
+    Vary: "Origin",
+  };
+}
+
+function isBlockedByCors(req: Request): boolean {
+  const origin = req.headers.get("origin")?.trim();
+  return Boolean(origin) && resolveCorsOrigin(req) === "null";
+}
 
 type NotificationEvent = "hire_request";
 
@@ -22,19 +61,34 @@ type ExpoTicket = {
   };
 };
 
-function jsonResponse(status: number, body: Record<string, unknown>) {
+function jsonResponse(
+  req: Request,
+  status: number,
+  body: Record<string, unknown>,
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...withCorsHeaders(req),
       "Content-Type": "application/json",
     },
   });
 }
 
 Deno.serve(async (req) => {
+  if (isBlockedByCors(req)) {
+    return new Response("Origin not allowed", {
+      status: 403,
+      headers: withCorsHeaders(req),
+    });
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: withCorsHeaders(req) });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse(req, 405, { error: "Method not allowed." });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -42,7 +96,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    return jsonResponse(500, {
+    return jsonResponse(req, 500, {
       error:
         "Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY.",
     });
@@ -68,7 +122,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser();
 
   if (callerError || !callerUser) {
-    return jsonResponse(401, { error: "Unauthorized." });
+    return jsonResponse(req, 401, { error: "Unauthorized." });
   }
 
   let payload: DispatchRequest;
@@ -76,11 +130,11 @@ Deno.serve(async (req) => {
   try {
     payload = (await req.json()) as DispatchRequest;
   } catch {
-    return jsonResponse(400, { error: "Invalid JSON payload." });
+    return jsonResponse(req, 400, { error: "Invalid JSON payload." });
   }
 
   if (payload.event !== "hire_request" || !payload.hireId) {
-    return jsonResponse(400, {
+    return jsonResponse(req, 400, {
       error: "Payload must include event='hire_request' and hireId.",
     });
   }
@@ -99,11 +153,11 @@ Deno.serve(async (req) => {
     .single();
 
   if (hireError || !hireRecord) {
-    return jsonResponse(404, { error: "Hire record not found." });
+    return jsonResponse(req, 404, { error: "Hire record not found." });
   }
 
   if (hireRecord.hirer_id !== callerUser.id) {
-    return jsonResponse(403, { error: "Forbidden." });
+    return jsonResponse(req, 403, { error: "Forbidden." });
   }
 
   const { data: workerProfile, error: workerError } = await admin
@@ -113,7 +167,29 @@ Deno.serve(async (req) => {
     .single();
 
   if (workerError || !workerProfile) {
-    return jsonResponse(404, { error: "Worker profile not found." });
+    return jsonResponse(req, 404, { error: "Worker profile not found." });
+  }
+
+  const dedupeSince = new Date(Date.now() - 60_000).toISOString();
+  const { data: recentNotification } = await admin
+    .from("notifications")
+    .select("id")
+    .eq("hire_id", hireRecord.id)
+    .eq("user_id", workerProfile.user_id)
+    .eq("type", "hire_request")
+    .gte("created_at", dedupeSince)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentNotification?.id) {
+    return jsonResponse(req, 200, {
+      notificationId: recentNotification.id,
+      workerUserId: workerProfile.user_id,
+      sentCount: 0,
+      invalidTokenCount: 0,
+      deduplicated: true,
+    });
   }
 
   const { data: hirerProfile } = await admin
@@ -147,7 +223,7 @@ Deno.serve(async (req) => {
     .single();
 
   if (notificationError || !insertedNotification) {
-    return jsonResponse(500, {
+    return jsonResponse(req, 500, {
       error: "Failed to create notification record.",
     });
   }
@@ -159,7 +235,7 @@ Deno.serve(async (req) => {
     .eq("is_active", true);
 
   if (tokensError) {
-    return jsonResponse(500, { error: "Failed to read push tokens." });
+    return jsonResponse(req, 500, { error: "Failed to read push tokens." });
   }
 
   const tokens = (activeTokens ?? [])
@@ -169,7 +245,7 @@ Deno.serve(async (req) => {
     );
 
   if (tokens.length === 0) {
-    return jsonResponse(200, {
+    return jsonResponse(req, 200, {
       notificationId: insertedNotification.id,
       workerUserId: workerProfile.user_id,
       sentCount: 0,
@@ -210,7 +286,7 @@ Deno.serve(async (req) => {
   });
 
   if (!expoResponse.ok) {
-    return jsonResponse(502, {
+    return jsonResponse(req, 502, {
       error: "Expo push API returned an error.",
       status: expoResponse.status,
     });
@@ -255,7 +331,7 @@ Deno.serve(async (req) => {
     })
     .eq("id", insertedNotification.id);
 
-  return jsonResponse(200, {
+  return jsonResponse(req, 200, {
     notificationId: insertedNotification.id,
     workerUserId: workerProfile.user_id,
     sentCount,

@@ -1,11 +1,50 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+function getAllowedOrigins(): string[] {
+  const configured = Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "";
+  return configured
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+function resolveCorsOrigin(req: Request): string {
+  const origin = req.headers.get("origin")?.trim();
+  if (!origin) {
+    return "*";
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
+    return "*";
+  }
+
+  return allowedOrigins.includes(origin) ? origin : "null";
+}
+
+function withCorsHeaders(
+  req: Request,
+  headers: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    ...baseCorsHeaders,
+    ...headers,
+    "Access-Control-Allow-Origin": resolveCorsOrigin(req),
+    Vary: "Origin",
+  };
+}
+
+function isBlockedByCors(req: Request): boolean {
+  const origin = req.headers.get("origin")?.trim();
+  return Boolean(origin) && resolveCorsOrigin(req) === "null";
+}
 
 type HireWorkerRequest = {
   workerId?: string;
@@ -19,11 +58,11 @@ type HireWorkerRequest = {
   hireLocalUnitId?: number;
 };
 
-function jsonResponse(status: number, body: Record<string, unknown>) {
+function jsonResponse(req: Request, status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...withCorsHeaders(req),
       "Content-Type": "application/json",
     },
   });
@@ -36,16 +75,16 @@ function isLikelyIpAddress(value: string): boolean {
 }
 
 function extractClientIp(req: Request): string | null {
+  const cfIp = req.headers.get("cf-connecting-ip")?.trim();
+  if (cfIp && isLikelyIpAddress(cfIp)) {
+    return cfIp;
+  }
+
   const forwardedFor = req.headers
     .get("x-forwarded-for")
     ?.split(",")[0]
     ?.trim();
-  const candidates = [
-    req.headers.get("cf-connecting-ip"),
-    req.headers.get("x-real-ip"),
-    req.headers.get("x-client-ip"),
-    forwardedFor,
-  ];
+  const candidates = [forwardedFor, req.headers.get("x-real-ip")];
 
   for (const candidate of candidates) {
     const ip = candidate?.trim();
@@ -97,8 +136,19 @@ function normalizeWorkDate(value: unknown): string | null {
 }
 
 Deno.serve(async (req) => {
+  if (isBlockedByCors(req)) {
+    return new Response("Origin not allowed", {
+      status: 403,
+      headers: withCorsHeaders(req),
+    });
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: withCorsHeaders(req) });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse(req, 405, { error: "Method not allowed." });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -106,7 +156,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    return jsonResponse(500, {
+    return jsonResponse(req, 500, {
       error:
         "Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY.",
     });
@@ -132,7 +182,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser();
 
   if (callerError || !callerUser) {
-    return jsonResponse(401, { error: "Unauthorized." });
+    return jsonResponse(req, 401, { error: "Unauthorized." });
   }
 
   let payload: HireWorkerRequest;
@@ -140,16 +190,16 @@ Deno.serve(async (req) => {
   try {
     payload = (await req.json()) as HireWorkerRequest;
   } catch {
-    return jsonResponse(400, { error: "Invalid JSON payload." });
+    return jsonResponse(req, 400, { error: "Invalid JSON payload." });
   }
 
   if (!payload.workerId || typeof payload.workerId !== "string") {
-    return jsonResponse(400, { error: "workerId is required." });
+    return jsonResponse(req, 400, { error: "workerId is required." });
   }
 
   const resolvedIp = extractClientIp(req);
   if (!resolvedIp) {
-    return jsonResponse(428, {
+    return jsonResponse(req, 428, {
       error: "Unable to resolve client IP from request headers.",
     });
   }
@@ -176,7 +226,7 @@ Deno.serve(async (req) => {
     .single();
 
   if (workerError || !workerProfile) {
-    return jsonResponse(404, { error: "Worker profile not found." });
+    return jsonResponse(req, 404, { error: "Worker profile not found." });
   }
 
   const insertPayload = {
@@ -210,20 +260,20 @@ Deno.serve(async (req) => {
 
   if (insertError) {
     if (insertError.code === "23505") {
-      return jsonResponse(409, {
+      return jsonResponse(req, 409, {
         error:
           "A non-cancelled hire request from this location already exists for this worker.",
       });
     }
 
-    return jsonResponse(500, {
+    return jsonResponse(req, 500, {
       error: "Failed to create hire record.",
       details: insertError.message,
       code: insertError.code,
     });
   }
 
-  return jsonResponse(200, {
+  return jsonResponse(req, 200, {
     hireRecord,
     resolvedIp,
   });

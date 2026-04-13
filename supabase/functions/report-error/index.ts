@@ -1,11 +1,54 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const sensitiveKeyPattern =
+  /(token|password|secret|authorization|cookie|api[-_]?key)/i;
+const maxReportsPerMinute = 30;
+
+function getAllowedOrigins(): string[] {
+  const configured = Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "";
+  return configured
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+function resolveCorsOrigin(req: Request): string {
+  const origin = req.headers.get("origin")?.trim();
+  if (!origin) {
+    return "*";
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
+    return "*";
+  }
+
+  return allowedOrigins.includes(origin) ? origin : "null";
+}
+
+function withCorsHeaders(
+  req: Request,
+  headers: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    ...baseCorsHeaders,
+    ...headers,
+    "Access-Control-Allow-Origin": resolveCorsOrigin(req),
+    Vary: "Origin",
+  };
+}
+
+function isBlockedByCors(req: Request): boolean {
+  const origin = req.headers.get("origin")?.trim();
+  return Boolean(origin) && resolveCorsOrigin(req) === "null";
+}
 
 type ReportRequest = {
   source?: "web" | "android" | "shared" | "edge";
@@ -23,11 +66,15 @@ type ReportRequest = {
   context?: Record<string, unknown>;
 };
 
-function jsonResponse(status: number, body: Record<string, unknown>) {
+function jsonResponse(
+  req: Request,
+  status: number,
+  body: Record<string, unknown>,
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...withCorsHeaders(req),
       "Content-Type": "application/json",
     },
   });
@@ -53,6 +100,11 @@ function sanitizeContext(value: unknown): Record<string, unknown> {
   const out: Record<string, unknown> = {};
 
   for (const [key, raw] of Object.entries(value)) {
+    if (sensitiveKeyPattern.test(key)) {
+      out[key] = "[REDACTED]";
+      continue;
+    }
+
     if (
       raw === null ||
       typeof raw === "string" ||
@@ -102,8 +154,19 @@ function extractClientIp(req: Request): string | null {
 }
 
 Deno.serve(async (req) => {
+  if (isBlockedByCors(req)) {
+    return new Response("Origin not allowed", {
+      status: 403,
+      headers: withCorsHeaders(req),
+    });
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: withCorsHeaders(req) });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse(req, 405, { error: "Method not allowed." });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -111,7 +174,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    return jsonResponse(500, {
+    return jsonResponse(req, 500, {
       error:
         "Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY.",
     });
@@ -140,14 +203,18 @@ Deno.serve(async (req) => {
   try {
     payload = (await req.json()) as ReportRequest;
   } catch {
-    return jsonResponse(400, { error: "Invalid JSON payload." });
+    return jsonResponse(req, 400, { error: "Invalid JSON payload." });
+  }
+
+  if (!callerUser) {
+    return jsonResponse(req, 401, { error: "Unauthorized." });
   }
 
   const message =
     typeof payload.message === "string" ? payload.message.trim() : "";
 
   if (!message) {
-    return jsonResponse(400, { error: "message is required." });
+    return jsonResponse(req, 400, { error: "message is required." });
   }
 
   const level =
@@ -196,10 +263,37 @@ Deno.serve(async (req) => {
     reported_at: new Date().toISOString(),
   };
 
+  const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+  let recentQuery = admin
+    .from("audit_log")
+    .select("id", { count: "exact", head: true })
+    .eq("table_name", "client_error_events")
+    .eq("user_id", callerUser.id)
+    .gte("created_at", oneMinuteAgo);
+
+  if (ipAddress) {
+    recentQuery = recentQuery.eq("ip_address", ipAddress);
+  }
+
+  const { count: recentCount, error: rateLimitError } = await recentQuery;
+  if (rateLimitError) {
+    return jsonResponse(req, 500, {
+      error: "Failed to evaluate rate limit.",
+      details: rateLimitError.message,
+      code: rateLimitError.code,
+    });
+  }
+
+  if ((recentCount ?? 0) >= maxReportsPerMinute) {
+    return jsonResponse(req, 429, {
+      error: "Too many reports. Please retry in one minute.",
+    });
+  }
+
   const { data, error } = await admin
     .from("audit_log")
     .insert({
-      user_id: callerUser?.id ?? null,
+      user_id: callerUser.id,
       action: `client_${level}:${category}`,
       table_name: "client_error_events",
       record_id: source,
@@ -211,14 +305,14 @@ Deno.serve(async (req) => {
     .single();
 
   if (error) {
-    return jsonResponse(500, {
+    return jsonResponse(req, 500, {
       error: "Failed to persist error report.",
       details: error.message,
       code: error.code,
     });
   }
 
-  return jsonResponse(200, {
+  return jsonResponse(req, 200, {
     logged: true,
     id: data?.id,
   });
